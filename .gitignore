@@ -1,4 +1,6 @@
 .venv/
 .env
 responses*
+processed*
+output*
 __pycache__/

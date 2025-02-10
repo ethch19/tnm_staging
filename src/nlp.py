@@ -1,72 +1,47 @@
 """Runs NLP on each study"""
 
-import os
-import re
-from pathlib import Path
-
-import ijson
 import spacy
-
-# from spacy import displacy
-from spacy.matcher import DependencyMatcher
-from tqdm import tqdm
-
-from utils import get_project_root
-
-# from dotenv import load_dotenv
-
-
-base_path = get_project_root()
-
-# load_dotenv()
-# TERMS = os.getenv("TERMS")
-
-
-def study_processor(folder_dir: Path = None):
-    """Processes each study incrementally"""
-    if folder_dir is None:
-        items = os.listdir(base_path)
-        responses = [item for item in items if item.startswith("responses")]
-
-        def extract_key(item):
-            match = re.search(r"\d+", item)
-            return int(match.group()) if match else -1
-
-        sorted_responses = sorted(responses, key=extract_key, reverse=True)
-        folder_dir = base_path / str(sorted_responses[0])
-        print(f"File path not selected, defaulting to: {folder_dir}")
-    first_file = folder_dir / "query_result_0.json"
-    with open(first_file, "rb") as f:
-        count = ijson.items(f, "totalCount")
-        try:
-            total_count = int(next(count))
-        except StopIteration:
-            print("Total count not found. Only one page exist")
-    with tqdm(total=total_count, desc="Processing Studies", unit="study") as p_bar:
-        nlp, matcher = nlp_init()
-        for file in folder_dir.iterdir():
-            if file.is_file():
-                with file.open("rb") as f:
-                    parser = ijson.items(f, "studies.item")
-                    for study in parser:
-                        search_nlp(nlp, matcher, study)
-                        # print(study["protocolSection"]["identificationModule"]["nctId"])
-                        p_bar.update(1)
-
+from spacy.matcher import Matcher
 
 patterns = [
     {
-        "label": "TNM_AJCC_Staging",
+        "label": "T_STAGE",
+        "pattern": [{"LOWER": {"regex": r"t[0-4]$"}}],
+    },
+    {
+        "label": "N_STAGE",
+        "pattern": [{"LOWER": {"regex": r"n[0-3]$"}}],
+    },
+    {
+        "label": "m_STAGE",
+        "pattern": [{"LOWER": {"regex": r"m[0-1]$"}}],
+    },
+    {
+        "label": "TNM_CLASSIFICATION",
         "pattern": [
-            {"RIGHT_ID": "tnm", "RIGHT_ATTRS": {"ORTH": "TNM"}},
-            {
-                "LEFT_ID": "tnm",
-                "REL_OP": "<",
-                "RIGHT_ID": "staging",
-                "RIGHT_ATTRS": {"DEP": "compound"},
-            },
+            {"LOWER": "tnm"},
+            {"OP": "?"},
+            {"LOWER": {"FUZZY": "classification"}},
         ],
-    }
+    },
+    {
+        "label": "TNM_STAGING",
+        "pattern": [
+            {"LOWER": "tnm"},
+            {"OP": "?"},
+            {"LOWER": "staging"},
+        ],
+    },
+    {
+        "label": "TNM_LONG",
+        "pattern": [
+            {"LOWER": {"FUZZY": "tumour"}},
+            {"OP": "?", "IS_PUNCT": True},
+            {"LOWER": "node"},
+            {"OP": "?", "IS_PUNCT": True},
+            {"LOWER": {"FUZZY": "metastasis"}},
+        ],
+    },
 ]
 
 
@@ -74,10 +49,28 @@ def nlp_init():
     """Set up NLP spacy"""
     spacy.require_gpu()
     nlp = spacy.load("en_core_web_trf")
-    matcher = DependencyMatcher(nlp.vocab)
+    matcher = Matcher(nlp.vocab)
     for p in patterns:
         matcher.add(p["label"], [p["pattern"]])
     return nlp, matcher
+
+
+def nlp_match(nlp, matcher, text):
+    """Runs NLP matching to find keywords"""
+    doc = nlp(text)
+    matches = matcher(doc)
+    if matches:
+        matches_list = []
+        for match_id, start, end in matches:
+            temp_dict = {}
+            match_label = nlp.vocab.strings[match_id]
+            matched_span = doc[start:end]
+            temp_dict[str(match_label)] = str(matched_span)
+            matches_list.append(temp_dict)
+            # print(f"Match found: {match_label}, Span: '{matched_span.text}'")
+        return matches_list
+    else:
+        return None
 
 
 def nlp_test(nlp, matcher):
@@ -97,16 +90,6 @@ def nlp_test(nlp, matcher):
         print(f"Match found: {match_label}, Span: '{matched_span.text}'")
 
 
-def search_nlp(nlp, matcher, study):
-    """Runs NLP matching to find keywords"""
-    doc = nlp(study)
-    matches = matcher(doc)
-    for match_id, start, end in matches:
-        match_label = nlp.vocab.strings[match_id]
-        matched_span = doc[start:end]
-        print(f"Match found: {match_label}, Span: '{matched_span.text}'")
-    # displacy.serve(matches)
-
-
-nlp_c, matcher_c = nlp_init()
-nlp_test(nlp_c, matcher_c)
+if __name__ == "__main__":
+    nlp, matcher = nlp_init()
+    nlp_test(nlp, matcher)
