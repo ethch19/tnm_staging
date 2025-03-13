@@ -5,20 +5,22 @@ import re
 import time
 from pathlib import Path
 from urllib.parse import urljoin
+import random
 
 import httpx
 import ijson
 from dotenv import load_dotenv
 from tqdm import tqdm
+import logging
 
 from utils import get_project_root
 
 load_dotenv()
+
 API_URL = os.getenv("API_URL")
 QUERY = os.getenv("QUERY")
 Q_FILTER = os.getenv("Q_FILTER")
 base_path = get_project_root()
-
 
 def params_creator(
     query: str, q_filter: str, page_token: str = None, page_size: int = 100
@@ -66,12 +68,14 @@ def fetch_studies(params: dict):
                 except StopIteration:
                     print("All pages have been parsed")
                     nextpage = False
+            time.sleep(1)
 
 
 def get_studies(client: httpx.Client, params: dict, save_path: Path):
     """Get studies response from ClinicalTrials.gov API"""
     url = urljoin(API_URL, "studies")
     elapsed = time.time()
+    print(url)
     with client.stream("GET", url, params=params) as response:
         response.raise_for_status()
         with open(save_path, "wb") as f:
@@ -92,7 +96,13 @@ def get_study_by_id(client: httpx.Client, nctid: str, save_path: Path):
                 f.write(chunk)
     print("Response saved;" f" Elapsed {(time.time() - elapsed)* 1000} milliseconds")
 
+def test_connection():
+    with httpx.Client() as client:
+        response = client.get("https://clinicaltrials.gov/api/v2/version")
+        print(response)
+        print(response.headers)
 
 if __name__ == "__main__":
-    q_params = params_creator(QUERY, Q_FILTER)
-    fetch_studies(q_params)
+    test_connection()
+    # q_params = params_creator(QUERY, Q_FILTER)
+    # fetch_studies(q_params)

@@ -68,10 +68,10 @@ def study_processor(exec_func, folder_dir: Path = None):
                         result = exec_func(study)
                         if result:
                             save_result = {
-                                "nctId": study["protocolSection"][
-                                    "identificationModule"
-                                ]["nctId"],
-                                "result": result,
+                                "nctId": study["protocolSection"]["identificationModule"]["nctId"],
+                                "startDate": study["protocolSection"]["statusModule"]["startDateStruct"]["date"],
+                                "possible_editions": result["possible_editions"],
+                                "matches": result["matches"],
                             }
                             processed_json.append(save_result)
                         # else:

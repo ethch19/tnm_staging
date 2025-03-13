@@ -6,15 +6,38 @@ from spacy.matcher import Matcher
 patterns = [
     {
         "label": "T_STAGE",
-        "pattern": [{"LOWER": {"regex": r"t[0-4]$"}}],
+        "pattern": [{"TEXT": {"regex": r"^[Tt][0-4]$"}}],
     },
     {
-        "label": "N_STAGE",
-        "pattern": [{"LOWER": {"regex": r"n[0-3]$"}}],
+        "label": "N_STAGE", # ALL editions
+        "pattern": [{"TEXT": {"regex": r"^[Nn][0-3]$"}}],
     },
     {
         "label": "m_STAGE",
-        "pattern": [{"LOWER": {"regex": r"m[0-1]$"}}],
+        "pattern": [{"TEXT": {"regex": r"^[Mm][0-1]$"}}],
+    },
+    {
+        "label": "T_STAGE_SUB", # >7th
+        "pattern": [{"TEXT": {"REGEX": r"^[Tt][1-2][ab]$"}}],
+    },
+    {
+        "label": "T_STAGE_SUB_8TH", # 8th only
+        "pattern": [{"TEXT": {"REGEX": r"^[Tt]1c$"}}],
+    },
+    {
+        "label": "M_STAGE_SUB", # >7th
+        "pattern": [{"TEXT": {"REGEX": r"^[Mm]1[ab]$"}}],
+    },
+    {
+        "label": "M_STAGE_SUB_8TH", # 8th only
+        "pattern": [{"TEXT": {"REGEX": r"^[Mm]1c$"}}],
+    },
+    {
+        "label": "NUM_EDITION",
+        "pattern": [
+            {"LIKE_NUM": True },
+            {"lower": { "IN": ["edition", "ed.", "ed"] }},
+        ],
     },
     {
         "label": "TNM_CLASSIFICATION",
@@ -43,7 +66,7 @@ patterns = [
         ],
     },
 ]
-
+# numerical words
 
 def nlp_init():
     """Set up NLP spacy"""
@@ -65,7 +88,11 @@ def nlp_match(nlp, matcher, text):
             temp_dict = {}
             match_label = nlp.vocab.strings[match_id]
             matched_span = doc[start:end]
-            temp_dict[str(match_label)] = str(matched_span)
+            temp_dict[str(match_label)] = str(matched_span.text)
+            for sent in doc.sents:
+                if sent.start <= start and sent.end >= end:
+                    temp_dict["sentence"] = str(sent.text)
+                    break
             matches_list.append(temp_dict)
             # print(f"Match found: {match_label}, Span: '{matched_span.text}'")
         return matches_list

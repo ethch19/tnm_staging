@@ -2,5 +2,5 @@
 .env
 responses*
 processed*
-output*
+*output*
 __pycache__/
